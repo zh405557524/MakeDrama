@@ -1,25 +1,34 @@
-import 'package:flutter/material.dart';
-
-import 'package:get/get.dart';
-import 'package:go_router/go_router.dart';
-
-import '../../routes/index.dart';
-import '../../store/index.dart';
-import '../../theme.dart';
-import '../../models/index.dart';
-import '../../widgets/index.dart';
+part of 'package:make_drama/pages/storyboard_edit/index.dart';
 
 class StoryboardEditPage extends StatelessWidget {
-  const StoryboardEditPage({super.key, required this.controller});
-
-  final WorkStore controller;
+  const StoryboardEditPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return GetBuilder<WorkStore>(
+    return GetBuilder<StoryboardEditController>(
+      init: StoryboardEditController(),
       builder: (controller) {
-        final work = controller.currentWork!;
-        final shot = controller.selectedStoryboard;
+        final workStore = controller.workStore;
+        final work = workStore.currentWork;
+        if (work == null) {
+          return AppShell(
+            child: Column(
+              children: [
+                const BrandTopBar(step: '3 / 4  分镜编辑'),
+                Expanded(
+                  child: StepStateView(
+                    icon: Icons.view_agenda_outlined,
+                    title: '还没有选择作品',
+                    message: '请先从首页创建或打开一个作品，再继续分镜处理流程。',
+                    actionLabel: '返回首页',
+                    onPressed: () => controller.backHome(context),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        final shot = workStore.selectedStoryboard;
         return AppShell(
           child: Column(
             children: [
@@ -28,12 +37,15 @@ class StoryboardEditPage extends StatelessWidget {
                 trailing: SmallActionButton(
                   label: '进入预览',
                   icon: Icons.play_arrow_rounded,
-                  onTap: () {
-                    work.currentStep = WorkStep.preview;
-                    context.pushNamed(RouteName.videoPreview);
-                  },
+                  onTap: () => controller.enterPreview(context),
                 ),
               ),
+              if (workStore.isLoadingStep)
+                const LinearProgressIndicator(
+                  minHeight: 3,
+                  color: AppColors.brandBlue,
+                  backgroundColor: Color(0xFF2E2642),
+                ),
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
@@ -59,7 +71,7 @@ class StoryboardEditPage extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '${controller.selectedStoryboardIndex + 1} / ${work.storyboards.length}',
+                            '${workStore.selectedStoryboardIndex + 1} / ${work.storyboards.length}',
                             style: const TextStyle(
                               color: AppColors.textMuted,
                               fontWeight: FontWeight.w700,
@@ -80,13 +92,23 @@ class StoryboardEditPage extends StatelessWidget {
                             return ShotThumb(
                               shot: item,
                               selected:
-                                  index == controller.selectedStoryboardIndex,
+                                  index == workStore.selectedStoryboardIndex,
                               onTap: () => controller.selectStoryboard(index),
                             );
                           },
                         ),
                       ),
                       const SizedBox(height: 18),
+                      if (workStore.errorMessage != null) ...[
+                        Text(
+                          workStore.errorMessage!,
+                          style: const TextStyle(
+                            color: AppColors.warning,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       PreviewPanel(shot: shot),
                       const SizedBox(height: 16),
                       Panel(
@@ -129,9 +151,8 @@ class StoryboardEditPage extends StatelessWidget {
                         children: [
                           ActionChipLike(
                             label: _roleLabel(work, shot.characterIds),
-                            onTap: () => context.pushNamed(
-                              RouteName.storyboardCharacterSelect,
-                            ),
+                            onTap: () =>
+                                controller.openCharacterSelect(context),
                           ),
                         ],
                       ),
@@ -142,9 +163,7 @@ class StoryboardEditPage extends StatelessWidget {
                         children: [
                           ActionChipLike(
                             label: _sceneLabel(work, shot.sceneId),
-                            onTap: () => context.pushNamed(
-                              RouteName.storyboardSceneSelect,
-                            ),
+                            onTap: () => controller.openSceneSelect(context),
                           ),
                         ],
                       ),

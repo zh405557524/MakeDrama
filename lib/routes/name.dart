@@ -1,3 +1,5 @@
+part of 'package:make_drama/routes/index.dart';
+
 class RouteName {
   const RouteName._();
 

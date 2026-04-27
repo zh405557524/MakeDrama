@@ -1,5 +1,43 @@
 enum WorkStep { draft, characters, scenes, storyboards, preview, completed }
 
+WorkStep workStepFromJson(dynamic value) {
+  final normalized = value?.toString().toLowerCase();
+  switch (normalized) {
+    case 'characters':
+      return WorkStep.characters;
+    case 'scenes':
+      return WorkStep.scenes;
+    case 'storyboards':
+      return WorkStep.storyboards;
+    case 'preview':
+      return WorkStep.preview;
+    case 'completed':
+      return WorkStep.completed;
+    case 'draft':
+    default:
+      return WorkStep.draft;
+  }
+}
+
+extension WorkStepWire on WorkStep {
+  String get wireName {
+    switch (this) {
+      case WorkStep.draft:
+        return 'draft';
+      case WorkStep.characters:
+        return 'characters';
+      case WorkStep.scenes:
+        return 'scenes';
+      case WorkStep.storyboards:
+        return 'storyboards';
+      case WorkStep.preview:
+        return 'preview';
+      case WorkStep.completed:
+        return 'completed';
+    }
+  }
+}
+
 extension WorkStepLabel on WorkStep {
   String get label {
     switch (this) {

@@ -1,80 +1,21 @@
-import 'dart:async';
-
 import 'package:get/get.dart';
 
 import '../models/index.dart';
 
+/// 作品全局状态容器。
+///
+/// 这里只保存跨页面共享的数据和同步状态变更；接口调用、轮询、
+/// 页面跳转等业务流程放在各页面 Controller 中。
 class WorkStore extends GetxController {
   static WorkStore get to => Get.find<WorkStore>();
+
   final List<DramaWork> works = [];
   DramaWork? currentWork;
   bool isParsing = false;
+  bool isLoadingWorks = false;
+  bool isLoadingStep = false;
+  String? errorMessage;
   int selectedStoryboardIndex = 0;
-
-  void seed() {
-    final demo = _buildWork(
-      name: '雨夜霓虹',
-      storyText: '雨夜里，少年林风站在废城入口，远处的霓虹像火焰一样燃烧。',
-      completed: true,
-    );
-    demo.currentStep = WorkStep.completed;
-    demo.videoUrl = 'mock://video/rain-night';
-    works.add(demo);
-
-    final draft = _buildWork(
-      name: '黑暗密林',
-      storyText: '幽深密林中，林风察觉到异样，夜冥的黑暗气息逼近。',
-    );
-    draft.currentStep = WorkStep.storyboards;
-    works.add(draft);
-  }
-
-  Future<DramaWork> parseAndCreate(String content) async {
-    if (isParsing) return currentWork!;
-    isParsing = true;
-    update();
-    await Future<void>.delayed(const Duration(milliseconds: 900));
-
-    final work = _buildWork(name: _nameFromText(content), storyText: content);
-    work.currentStep = WorkStep.characters;
-    currentWork = work;
-    works.insert(0, work);
-    isParsing = false;
-    update();
-    return work;
-  }
-
-  void openWork(DramaWork work) {
-    currentWork = work;
-    selectedStoryboardIndex = 0;
-    update();
-  }
-
-  Future<void> generateCharacter(CharacterProfile character) async {
-    if (character.isRunning) return;
-    character.taskStatus = GenerationStatus.running;
-    character.runningTaskId =
-        'task-character-${character.id}-${DateTime.now().millisecondsSinceEpoch}';
-    update();
-    await Future<void>.delayed(const Duration(milliseconds: 1100));
-    character.imageUrl = 'mock://character/${character.id}';
-    character.taskStatus = GenerationStatus.succeeded;
-    character.runningTaskId = null;
-    update();
-  }
-
-  Future<void> generateScene(SceneProfile scene) async {
-    if (scene.isRunning) return;
-    scene.taskStatus = GenerationStatus.running;
-    scene.runningTaskId =
-        'task-scene-${scene.id}-${DateTime.now().millisecondsSinceEpoch}';
-    update();
-    await Future<void>.delayed(const Duration(milliseconds: 1100));
-    scene.imageUrl = 'mock://scene/${scene.id}';
-    scene.taskStatus = GenerationStatus.succeeded;
-    scene.runningTaskId = null;
-    update();
-  }
 
   bool get hasRunningCharacterTask {
     return currentWork?.characters.any((item) => item.isRunning) ?? false;
@@ -84,6 +25,125 @@ class WorkStore extends GetxController {
     return currentWork?.scenes.any((item) => item.isRunning) ?? false;
   }
 
+  StoryboardShot get selectedStoryboard {
+    final work = currentWork;
+    if (work == null || work.storyboards.isEmpty) {
+      return StoryboardShot(
+        id: 'empty',
+        sortOrder: 1,
+        description: '暂无分镜',
+        characterIds: const [],
+        sceneId: null,
+        style: '暗色系',
+        voicePreset: '少年感 · 雄厚',
+        bgmPreset: '史诗战鼓',
+      );
+    }
+    return work.storyboards[selectedStoryboardIndex.clamp(
+      0,
+      work.storyboards.length - 1,
+    )];
+  }
+
+  void setWorks(List<DramaWork> data) {
+    works
+      ..clear()
+      ..addAll(data);
+    update();
+  }
+
+  void setParsing(bool value) {
+    isParsing = value;
+    update();
+  }
+
+  void setLoadingWorks(bool value) {
+    isLoadingWorks = value;
+    update();
+  }
+
+  void setLoadingStep(bool value) {
+    isLoadingStep = value;
+    update();
+  }
+
+  void setError(Object? error) {
+    errorMessage = error == null ? null : errorText(error);
+    update();
+  }
+
+  void clearError() {
+    errorMessage = null;
+    update();
+  }
+
+  void openWork(DramaWork work) {
+    currentWork = work;
+    selectedStoryboardIndex = 0;
+    errorMessage = null;
+    update();
+  }
+
+  void mergeCurrentWork(DramaWork next, {bool replaceCurrent = false}) {
+    final current = currentWork;
+    if (replaceCurrent || current == null || current.id != next.id) {
+      currentWork = next;
+      upsertWork(next);
+      selectedStoryboardIndex = 0;
+      update();
+      return;
+    }
+
+    current.name = next.name;
+    current.currentStep = next.currentStep;
+    current.durationSeconds = next.durationSeconds;
+    current.coverUrl = next.coverUrl ?? current.coverUrl;
+    current.videoUrl = next.videoUrl;
+    current.videoTaskStatus = next.videoTaskStatus;
+
+    if (next.storyText.isNotEmpty) current.storyText = next.storyText;
+    if (next.characters.isNotEmpty) {
+      current.characters
+        ..clear()
+        ..addAll(next.characters);
+    }
+    if (next.scenes.isNotEmpty) {
+      current.scenes
+        ..clear()
+        ..addAll(next.scenes);
+    }
+    if (next.storyboards.isNotEmpty) {
+      current.storyboards
+        ..clear()
+        ..addAll(next.storyboards);
+      _normalizeStoryboardIndex();
+    }
+
+    upsertWork(current);
+    update();
+  }
+
+  void upsertWork(DramaWork work) {
+    final index = works.indexWhere((item) => item.id == work.id);
+    if (index >= 0) {
+      works[index] = work;
+    } else {
+      works.insert(0, work);
+    }
+    update();
+  }
+
+  void setCurrentStep(WorkStep step) {
+    currentWork?.currentStep = step;
+    update();
+  }
+
+  void selectStoryboard(int index) {
+    selectedStoryboardIndex = index;
+    _normalizeStoryboardIndex();
+    update();
+  }
+
   void toggleCharacterSelected(CharacterProfile character) {
     character.selected = !character.selected;
     update();
@@ -91,31 +151,6 @@ class WorkStore extends GetxController {
 
   void toggleSceneSelected(SceneProfile scene) {
     scene.selected = !scene.selected;
-    update();
-  }
-
-  void confirmCharacters() {
-    if (hasRunningCharacterTask) return;
-    currentWork?.currentStep = WorkStep.scenes;
-    update();
-  }
-
-  void confirmScenes() {
-    if (hasRunningSceneTask) return;
-    currentWork?.currentStep = WorkStep.storyboards;
-    update();
-  }
-
-  StoryboardShot get selectedStoryboard {
-    final work = currentWork!;
-    return work.storyboards[selectedStoryboardIndex.clamp(
-      0,
-      work.storyboards.length - 1,
-    )];
-  }
-
-  void selectStoryboard(int index) {
-    selectedStoryboardIndex = index;
     update();
   }
 
@@ -154,188 +189,153 @@ class WorkStore extends GetxController {
     update();
   }
 
-  Future<void> generateStoryboard(StoryboardShot shot) async {
-    if (shot.isRunning) return;
+  void markCharacterRunning(CharacterProfile character) {
+    character.taskStatus = GenerationStatus.running;
+    character.runningTaskId =
+        'local-character-${DateTime.now().microsecondsSinceEpoch}';
+    update();
+  }
+
+  void markSceneRunning(SceneProfile scene) {
+    scene.taskStatus = GenerationStatus.running;
+    scene.runningTaskId =
+        'local-scene-${DateTime.now().microsecondsSinceEpoch}';
+    update();
+  }
+
+  void markStoryboardRunning(StoryboardShot shot) {
     shot.taskStatus = GenerationStatus.running;
     shot.runningTaskId =
-        'task-storyboard-${shot.id}-${DateTime.now().millisecondsSinceEpoch}';
-    update();
-    await Future<void>.delayed(const Duration(milliseconds: 1200));
-    shot.imageUrl = 'mock://storyboard/${shot.id}';
-    shot.taskStatus = GenerationStatus.succeeded;
-    shot.runningTaskId = null;
-    currentWork?.currentStep = WorkStep.preview;
+        'local-storyboard-${DateTime.now().microsecondsSinceEpoch}';
     update();
   }
 
-  Future<void> generateAllStoryboards() async {
+  void markPendingStoryboardsRunning() {
     final work = currentWork;
     if (work == null) return;
-    final pending = work.storyboards
-        .where((item) => !item.isRunning && item.imageUrl == null)
-        .toList();
-    for (final shot in pending) {
-      unawaited(generateStoryboard(shot));
+    for (final shot in work.storyboards.where((item) => !item.hasImage)) {
+      markStoryboardRunning(shot);
     }
+    update();
   }
 
-  Future<void> generateVideo() async {
+  void markVideoRunning() {
     final work = currentWork;
-    if (work == null || work.isVideoRunning) return;
+    if (work == null) return;
     work.currentStep = WorkStep.preview;
     work.videoTaskStatus = GenerationStatus.running;
     update();
-    await Future<void>.delayed(const Duration(milliseconds: 1500));
-    work.videoUrl = 'mock://video/${work.id}';
-    work.videoTaskStatus = GenerationStatus.succeeded;
-    work.currentStep = WorkStep.completed;
+  }
+
+  void markCharacterFailed(CharacterProfile character, Object error) {
+    character.taskStatus = GenerationStatus.failed;
+    character.runningTaskId = null;
+    errorMessage = errorText(error);
     update();
   }
 
-  DramaWork _buildWork({
-    required String name,
-    required String storyText,
-    bool completed = false,
-  }) {
-    final characters = <CharacterProfile>[
-      CharacterProfile(
-        id: 'linfeng',
-        name: '林风',
-        roleTag: '主角',
-        description: '十八岁少年，天赋异禀，心怀苍生，手持玄铁战戟',
-        imageUrl: completed
-            ? 'mock://character/linfeng'
-            : 'mock://character/linfeng',
-      ),
-      CharacterProfile(
-        id: 'yeming',
-        name: '夜冥',
-        roleTag: '反派',
-        description: '上古魔神，掌控黑暗之力，欲吞噬世间所有光明',
-        imageUrl: completed
-            ? 'mock://character/yeming'
-            : 'mock://character/yeming',
-      ),
-      CharacterProfile(
-        id: 'suxue',
-        name: '苏雪',
-        roleTag: '女主',
-        description: '冰雪仙子，医术精湛，外冷内热，暗恋林风',
-      ),
-      CharacterProfile(
-        id: 'tianxing',
-        name: '天行者',
-        roleTag: '导师',
-        description: '隐世高人，白须飘飘，是林风修行路上的引路人',
-        selected: false,
-      ),
-    ];
-
-    final scenes = <SceneProfile>[
-      SceneProfile(
-        id: 'forest',
-        name: '黑暗密林',
-        description: '幽深密林，雾气弥漫，夜色压住树冠',
-        tags: ['暗色系', '紧张'],
-        imageUrl: completed ? 'mock://scene/forest' : 'mock://scene/forest',
-      ),
-      SceneProfile(
-        id: 'raincity',
-        name: '雨夜街口',
-        description: '霓虹雨幕下的废城入口，危机逼近',
-        tags: ['彩色系', '危机'],
-      ),
-      SceneProfile(
-        id: 'ruins',
-        name: '古城废墟',
-        description: '断壁残垣与古老符文交错，风声低沉',
-        tags: ['国风水墨', '厚重'],
-      ),
-    ];
-
-    final storyboards = <StoryboardShot>[
-      StoryboardShot(
-        id: 'shot1',
-        sortOrder: 1,
-        description: '晴空万里，少年林风孤身站在悬崖之前，远望被黑雾侵蚀的苍茫大地。',
-        characterIds: ['linfeng'],
-        sceneId: 'raincity',
-        style: '暗色系',
-        voicePreset: '少年感 · 雄厚',
-        bgmPreset: '史诗战鼓',
-        imageUrl: completed ? 'mock://shot/1' : 'mock://shot/1',
-      ),
-      StoryboardShot(
-        id: 'shot2',
-        sortOrder: 2,
-        description: '远处传来低沉号角，黑雾中浮现夜冥的轮廓，林风握紧战戟。',
-        characterIds: ['linfeng', 'yeming'],
-        sceneId: 'forest',
-        style: '暗色系',
-        voicePreset: '少年感 · 激昂',
-        bgmPreset: '黑暗低鸣',
-        imageUrl: completed ? 'mock://shot/2' : null,
-      ),
-      StoryboardShot(
-        id: 'shot3',
-        sortOrder: 3,
-        description: '苏雪踏雪而来，掌心灵光亮起，为林风指明通往古城的路线。',
-        characterIds: ['linfeng', 'suxue'],
-        sceneId: 'ruins',
-        style: '清新淡雅',
-        voicePreset: '温柔 · 女声',
-        bgmPreset: '温情旋律',
-      ),
-      StoryboardShot(
-        id: 'shot4',
-        sortOrder: 4,
-        description: '幽深密林中，林风察觉到异样，夜冥的黑暗气息如潮水般涌来。',
-        characterIds: ['linfeng', 'yeming'],
-        sceneId: 'forest',
-        style: '暗色系',
-        voicePreset: '少年感 · 雄厚',
-        bgmPreset: '黑暗低鸣',
-      ),
-      StoryboardShot(
-        id: 'shot5',
-        sortOrder: 5,
-        description: '一道金色剑光划破黑夜，林风跃起迎向夜冥，战斗正式爆发。',
-        characterIds: ['linfeng', 'yeming'],
-        sceneId: 'forest',
-        style: '科幻赛博',
-        voicePreset: '霸气 · 男声',
-        bgmPreset: '终极战歌',
-      ),
-      StoryboardShot(
-        id: 'shot6',
-        sortOrder: 6,
-        description: '黑雾散去，天光落下，林风回望废城，新的旅程才刚刚开始。',
-        characterIds: ['linfeng'],
-        sceneId: 'ruins',
-        style: '国风水墨',
-        voicePreset: '中气 · 洪亮',
-        bgmPreset: '静谧空灵',
-      ),
-    ];
-
-    return DramaWork(
-      id: 'work-${DateTime.now().microsecondsSinceEpoch}-${works.length}',
-      name: name,
-      storyText: storyText,
-      currentStep: WorkStep.characters,
-      characters: characters,
-      scenes: scenes,
-      storyboards: storyboards,
-      videoUrl: completed ? 'mock://video/completed' : null,
-      videoTaskStatus: completed
-          ? GenerationStatus.succeeded
-          : GenerationStatus.idle,
-    );
+  void markSceneFailed(SceneProfile scene, Object error) {
+    scene.taskStatus = GenerationStatus.failed;
+    scene.runningTaskId = null;
+    errorMessage = errorText(error);
+    update();
   }
 
-  String _nameFromText(String content) {
-    final normalized = content.trim().replaceAll('\n', ' ');
-    if (normalized.isEmpty) return '未命名漫剧';
-    return normalized.length > 6 ? normalized.substring(0, 6) : normalized;
+  void markStoryboardFailed(StoryboardShot shot, Object error) {
+    shot.taskStatus = GenerationStatus.failed;
+    shot.runningTaskId = null;
+    errorMessage = errorText(error);
+    update();
+  }
+
+  void markRunningStoryboardsFailed(Object error) {
+    final work = currentWork;
+    if (work == null) return;
+    for (final shot in work.storyboards.where((item) => item.isRunning)) {
+      shot.taskStatus = GenerationStatus.failed;
+      shot.runningTaskId = null;
+    }
+    errorMessage = errorText(error);
+    update();
+  }
+
+  void markVideoFailed(Object error) {
+    final work = currentWork;
+    if (work == null) return;
+    work.videoTaskStatus = GenerationStatus.failed;
+    errorMessage = errorText(error);
+    update();
+  }
+
+  void applyTask(GenerationTaskModel task) {
+    final work = currentWork;
+    if (work == null) return;
+
+    if (task.taskType == 'video') {
+      work.videoTaskStatus = task.status;
+      if (task.status == GenerationStatus.succeeded) {
+        work.currentStep = WorkStep.completed;
+      }
+      update();
+      return;
+    }
+
+    if (task.taskType == 'storyboard_batch' && task.targetId == null) {
+      for (final shot in work.storyboards.where((item) => item.isRunning)) {
+        shot.taskStatus = task.status;
+        if (task.status.isTerminal) shot.runningTaskId = null;
+      }
+      update();
+      return;
+    }
+
+    final targetId = task.targetId;
+    if (targetId == null) return;
+
+    switch (task.targetType) {
+      case 'character':
+        final character = work.characters.firstWhereOrNull(
+          (item) => item.id == targetId,
+        );
+        if (character != null) {
+          character.taskStatus = task.status;
+          character.runningTaskId = task.status.isTerminal ? null : task.taskId;
+        }
+        break;
+      case 'scene':
+        final scene = work.scenes.firstWhereOrNull(
+          (item) => item.id == targetId,
+        );
+        if (scene != null) {
+          scene.taskStatus = task.status;
+          scene.runningTaskId = task.status.isTerminal ? null : task.taskId;
+        }
+        break;
+      case 'storyboard':
+        final shot = work.storyboards.firstWhereOrNull(
+          (item) => item.id == targetId,
+        );
+        if (shot != null) {
+          shot.taskStatus = task.status;
+          shot.runningTaskId = task.status.isTerminal ? null : task.taskId;
+        }
+        break;
+    }
+    update();
+  }
+
+  String errorText(Object error) {
+    if (error is ApiException) return error.message;
+    return error.toString();
+  }
+
+  void _normalizeStoryboardIndex() {
+    final length = currentWork?.storyboards.length ?? 0;
+    if (length == 0) {
+      selectedStoryboardIndex = 0;
+      return;
+    }
+    if (selectedStoryboardIndex >= length) selectedStoryboardIndex = length - 1;
+    if (selectedStoryboardIndex < 0) selectedStoryboardIndex = 0;
   }
 }

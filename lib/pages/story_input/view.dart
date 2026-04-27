@@ -1,17 +1,7 @@
-import 'package:flutter/material.dart';
-
-import 'package:get/get.dart';
-import 'package:go_router/go_router.dart';
-
-import '../../routes/index.dart';
-import '../../store/index.dart';
-import '../../theme.dart';
-import '../../widgets/index.dart';
+part of 'package:make_drama/pages/story_input/index.dart';
 
 class StoryInputPage extends StatefulWidget {
-  const StoryInputPage({super.key, required this.controller});
-
-  final WorkStore controller;
+  const StoryInputPage({super.key});
 
   @override
   State<StoryInputPage> createState() => _StoryInputPageState();
@@ -36,8 +26,10 @@ class _StoryInputPageState extends State<StoryInputPage> {
 
   @override
   Widget build(BuildContext context) {
-    return GetBuilder<WorkStore>(
+    return GetBuilder<StoryInputController>(
+      init: StoryInputController(),
       builder: (controller) {
+        final workStore = controller.workStore;
         return AppShell(
           child: Column(
             children: [
@@ -122,18 +114,14 @@ class _StoryInputPageState extends State<StoryInputPage> {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                   child: PrimaryButton(
-                    label: controller.isParsing ? '正在解析...' : '开始解析',
-                    loading: controller.isParsing,
-                    onPressed: controller.isParsing
+                    label: workStore.isParsing ? '正在解析...' : '开始解析',
+                    loading: workStore.isParsing,
+                    onPressed: workStore.isParsing
                         ? null
-                        : () async {
-                            final work = await controller.parseAndCreate(
-                              textController.text,
-                            );
-                            controller.openWork(work);
-                            if (!context.mounted) return;
-                            context.goNamed(RouteName.characterGenerate);
-                          },
+                        : () => controller.parseAndCreate(
+                            context,
+                            textController.text,
+                          ),
                   ),
                 ),
               ),

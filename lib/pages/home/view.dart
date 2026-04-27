@@ -1,23 +1,14 @@
-import 'package:flutter/material.dart';
-
-import 'package:get/get.dart';
-import 'package:go_router/go_router.dart';
-
-import '../../routes/index.dart';
-import '../../store/index.dart';
-import '../../theme.dart';
-import '../../models/index.dart';
-import '../../widgets/index.dart';
+part of 'package:make_drama/pages/home/index.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key, required this.controller});
-
-  final WorkStore controller;
+  const HomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return GetBuilder<WorkStore>(
+    return GetBuilder<HomeController>(
+      init: HomeController(),
       builder: (controller) {
+        final workStore = controller.workStore;
         return AppShell(
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
@@ -57,7 +48,7 @@ class HomePage extends StatelessWidget {
                     height: 58,
                     child: PrimaryButton(
                       label: '+  开始创作  ›',
-                      onPressed: () => _openStoryInput(context),
+                      onPressed: () => controller.openStoryInput(context),
                     ),
                   ),
                 ),
@@ -82,7 +73,7 @@ class HomePage extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      '我的作品  ${controller.works.length}',
+                      '我的作品  ${workStore.works.length}',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
@@ -99,6 +90,26 @@ class HomePage extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 16),
+                if (workStore.isLoadingWorks)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 12),
+                    child: LinearProgressIndicator(
+                      minHeight: 3,
+                      color: AppColors.brandBlue,
+                      backgroundColor: Color(0xFF2E2642),
+                    ),
+                  ),
+                if (workStore.errorMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      workStore.errorMessage!,
+                      style: const TextStyle(
+                        color: AppColors.warning,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
                 GridView.count(
                   physics: const NeverScrollableScrollPhysics(),
                   shrinkWrap: true,
@@ -107,11 +118,13 @@ class HomePage extends StatelessWidget {
                   crossAxisSpacing: 16,
                   childAspectRatio: 0.82,
                   children: [
-                    NewWorkCard(onTap: () => _openStoryInput(context)),
-                    for (final work in controller.works)
+                    NewWorkCard(
+                      onTap: () => controller.openStoryInput(context),
+                    ),
+                    for (final work in workStore.works)
                       WorkCard(
                         work: work,
-                        onTap: () => _openWork(context, work),
+                        onTap: () => controller.openWork(context, work),
                       ),
                   ],
                 ),
@@ -121,21 +134,5 @@ class HomePage extends StatelessWidget {
         );
       },
     );
-  }
-
-  void _openStoryInput(BuildContext context) {
-    context.pushNamed(RouteName.storyInput);
-  }
-
-  void _openWork(BuildContext context, DramaWork work) {
-    controller.openWork(work);
-    final routeName = switch (work.currentStep) {
-      WorkStep.draft => RouteName.storyInput,
-      WorkStep.characters => RouteName.characterGenerate,
-      WorkStep.scenes => RouteName.sceneGenerate,
-      WorkStep.storyboards => RouteName.storyboardEdit,
-      WorkStep.preview || WorkStep.completed => RouteName.videoPreview,
-    };
-    context.pushNamed(routeName);
   }
 }

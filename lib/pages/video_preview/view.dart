@@ -1,17 +1,7 @@
-import 'package:flutter/material.dart';
-
-import 'package:get/get.dart';
-import 'package:go_router/go_router.dart';
-
-import '../../routes/index.dart';
-import '../../store/index.dart';
-import '../../theme.dart';
-import '../../widgets/index.dart';
+part of 'package:make_drama/pages/video_preview/index.dart';
 
 class VideoPreviewPage extends StatefulWidget {
-  const VideoPreviewPage({super.key, required this.controller});
-
-  final WorkStore controller;
+  const VideoPreviewPage({super.key});
 
   @override
   State<VideoPreviewPage> createState() => _VideoPreviewPageState();
@@ -22,14 +12,30 @@ class _VideoPreviewPageState extends State<VideoPreviewPage> {
 
   @override
   Widget build(BuildContext context) {
-    return GetBuilder<WorkStore>(
+    return GetBuilder<VideoPreviewController>(
+      init: VideoPreviewController(),
       builder: (controller) {
-        final work = controller.currentWork!;
-        final current =
-            work.storyboards[controller.selectedStoryboardIndex.clamp(
-              0,
-              work.storyboards.length - 1,
-            )];
+        final workStore = controller.workStore;
+        final work = workStore.currentWork;
+        if (work == null) {
+          return AppShell(
+            child: Column(
+              children: [
+                const BrandTopBar(step: '4 / 4  视频预览'),
+                Expanded(
+                  child: StepStateView(
+                    icon: Icons.video_library_outlined,
+                    title: '还没有选择作品',
+                    message: '请先从首页创建或打开一个作品，再继续视频预览流程。',
+                    actionLabel: '返回首页',
+                    onPressed: () => controller.backHome(context),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        final current = workStore.selectedStoryboard;
         return AppShell(
           child: Column(
             children: [
@@ -38,9 +44,15 @@ class _VideoPreviewPageState extends State<VideoPreviewPage> {
                 trailing: SmallActionButton(
                   label: '返回编辑',
                   icon: Icons.chevron_left_rounded,
-                  onTap: () => context.goNamed(RouteName.storyboardEdit),
+                  onTap: () => controller.backToEdit(context),
                 ),
               ),
+              if (workStore.isLoadingStep)
+                const LinearProgressIndicator(
+                  minHeight: 3,
+                  color: AppColors.brandBlue,
+                  backgroundColor: Color(0xFF2E2642),
+                ),
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
@@ -63,6 +75,16 @@ class _VideoPreviewPageState extends State<VideoPreviewPage> {
                         ),
                       ),
                       const SizedBox(height: 26),
+                      if (workStore.errorMessage != null) ...[
+                        Text(
+                          workStore.errorMessage!,
+                          style: const TextStyle(
+                            color: AppColors.warning,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       Container(
                         height: 260,
                         padding: const EdgeInsets.all(16),
@@ -206,9 +228,7 @@ class _VideoPreviewPageState extends State<VideoPreviewPage> {
                                   border: Border.all(
                                     color:
                                         index ==
-                                            widget
-                                                .controller
-                                                .selectedStoryboardIndex
+                                            workStore.selectedStoryboardIndex
                                         ? AppColors.borderActive
                                         : AppColors.border,
                                   ),
@@ -242,9 +262,7 @@ class _VideoPreviewPageState extends State<VideoPreviewPage> {
                         label: '分享链接',
                         icon: Icons.share_outlined,
                         onPressed: work.hasVideo
-                            ? () => ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('分享链接已生成')),
-                              )
+                            ? () => controller.share(context)
                             : null,
                       ),
                     ],

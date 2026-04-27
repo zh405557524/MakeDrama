@@ -1,22 +1,34 @@
-import 'package:flutter/material.dart';
-
-import 'package:get/get.dart';
-
-import '../../store/index.dart';
-import '../../theme.dart';
-import '../../widgets/index.dart';
+part of 'package:make_drama/pages/storyboard_character_select/index.dart';
 
 class StoryboardCharacterSelectPage extends StatelessWidget {
-  const StoryboardCharacterSelectPage({super.key, required this.controller});
-
-  final WorkStore controller;
+  const StoryboardCharacterSelectPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return GetBuilder<WorkStore>(
+    return GetBuilder<StoryboardCharacterSelectController>(
+      init: StoryboardCharacterSelectController(),
       builder: (controller) {
-        final work = controller.currentWork!;
-        final selectedIds = controller.selectedStoryboard.characterIds;
+        final workStore = controller.workStore;
+        final work = workStore.currentWork;
+        if (work == null) {
+          return AppShell(
+            child: Column(
+              children: [
+                const PlainTopBar(title: '角色选择', hint: '可多选'),
+                Expanded(
+                  child: StepStateView(
+                    icon: Icons.group_outlined,
+                    title: '还没有选择作品',
+                    message: '请先从首页创建或打开一个作品，再选择分镜角色。',
+                    actionLabel: '返回首页',
+                    onPressed: () => controller.backHome(context),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        final selectedIds = workStore.selectedStoryboard.characterIds;
         return AppShell(
           child: Column(
             children: [
@@ -64,7 +76,7 @@ class StoryboardCharacterSelectPage extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                   child: PrimaryButton(
                     label: '应用 ${selectedIds.length} 个角色',
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () => controller.apply(context),
                   ),
                 ),
               ),
