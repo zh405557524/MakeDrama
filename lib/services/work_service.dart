@@ -17,8 +17,8 @@ class WorkService extends GetxService {
       return _mockWorks;
     }
 
-    final data = await WorkAPI.getWorks();
-    return jsonMapList(data['items']).map(_workFromListJson).toList();
+    final result = await WorkAPI.getWorks();
+    return result.items;
   }
 
   Future<DramaWork> parseAndCreate(String content) async {
@@ -33,16 +33,12 @@ class WorkService extends GetxService {
       return work;
     }
 
-    final data = await WorkAPI.parseStory(content: content);
-    return _workFromStepJson(data, fallbackStep: WorkStep.characters);
+    return (await WorkAPI.parseStory(content: content)).work;
   }
 
   Future<DramaWork> loadCharacters(String workId) async {
     if (useMock) return _findMockWork(workId);
-    return _workFromStepJson(
-      await CharacterAPI.getCharacters(workId),
-      fallbackStep: WorkStep.characters,
-    );
+    return (await CharacterAPI.getCharacters(workId)).work;
   }
 
   Future<GenerationTaskModel> createCharacterImageTask({
@@ -62,7 +58,7 @@ class WorkService extends GetxService {
       );
     }
 
-    return _taskFromJson(
+    return _taskFromTicket(
       await CharacterAPI.createImageTask(
         workId: workId,
         characterId: character.id,
@@ -96,10 +92,7 @@ class WorkService extends GetxService {
 
   Future<DramaWork> loadScenes(String workId) async {
     if (useMock) return _findMockWork(workId);
-    return _workFromStepJson(
-      await SceneAPI.getScenes(workId),
-      fallbackStep: WorkStep.scenes,
-    );
+    return (await SceneAPI.getScenes(workId)).work;
   }
 
   Future<GenerationTaskModel> createSceneImageTask({
@@ -119,7 +112,7 @@ class WorkService extends GetxService {
       );
     }
 
-    return _taskFromJson(
+    return _taskFromTicket(
       await SceneAPI.createImageTask(workId: workId, sceneId: scene.id),
       workId: workId,
       taskType: 'scene_image',
@@ -150,10 +143,7 @@ class WorkService extends GetxService {
 
   Future<DramaWork> loadStoryboards(String workId) async {
     if (useMock) return _findMockWork(workId);
-    return _workFromStepJson(
-      await StoryboardAPI.getStoryboards(workId),
-      fallbackStep: WorkStep.storyboards,
-    );
+    return (await StoryboardAPI.getStoryboards(workId)).work;
   }
 
   Future<void> updateStoryboard({
@@ -182,7 +172,7 @@ class WorkService extends GetxService {
       );
     }
 
-    return _taskFromJson(
+    return _taskFromTicket(
       await StoryboardAPI.generateStoryboard(
         workId: workId,
         storyboardId: shot.id,
@@ -211,7 +201,7 @@ class WorkService extends GetxService {
       );
     }
 
-    return _taskFromJson(
+    return _taskFromTicket(
       await StoryboardAPI.generateAllStoryboards(workId),
       workId: workId,
       taskType: 'storyboard_batch',
@@ -221,10 +211,7 @@ class WorkService extends GetxService {
 
   Future<DramaWork> loadVideo(String workId) async {
     if (useMock) return _findMockWork(workId);
-    return _workFromStepJson(
-      await VideoAPI.getVideo(workId),
-      fallbackStep: WorkStep.preview,
-    );
+    return (await VideoAPI.getVideo(workId)).work;
   }
 
   Future<GenerationTaskModel> generateVideo(String workId) async {
@@ -242,7 +229,7 @@ class WorkService extends GetxService {
       );
     }
 
-    return _taskFromJson(
+    return _taskFromTicket(
       await VideoAPI.generateVideo(workId),
       workId: workId,
       taskType: 'video',
@@ -255,60 +242,18 @@ class WorkService extends GetxService {
     if (useMock) {
       return 'mock://share/$workId';
     }
-    final data = await VideoAPI.createShareLink(workId: workId);
-    return jsonStringValue(data['url']);
+    final result = await VideoAPI.createShareLink(workId: workId);
+    return result.url;
   }
 
-  DramaWork _workFromListJson(Map<String, dynamic> json) {
-    return DramaWork.fromJson(json);
-  }
-
-  DramaWork _workFromStepJson(
-    Map<String, dynamic> data, {
-    required WorkStep fallbackStep,
-  }) {
-    final workJson = jsonMap(data['work']);
-    final source = workJson.isEmpty ? data : workJson;
-    final work = DramaWork.fromJson(
-      {
-        ...source,
-        'currentStep': source['currentStep'] ?? fallbackStep.wireName,
-      },
-      characters: jsonMapList(
-        data['characters'],
-      ).map(CharacterProfile.fromJson).toList(),
-      scenes: jsonMapList(data['scenes']).map(SceneProfile.fromJson).toList(),
-      storyboards: jsonMapList(
-        data['storyboards'],
-      ).map(StoryboardShot.fromJson).toList(),
-      videoUrl: jsonString(data['videoUrl']),
-      videoTaskStatus: jsonString(data['runningTaskId']) != null
-          ? GenerationStatus.running
-          : generationStatusFromJson(data['status']),
-    );
-
-    final runningVideoTaskId = jsonString(data['runningTaskId']);
-    if (runningVideoTaskId != null) {
-      work.videoTaskStatus = GenerationStatus.running;
-    }
-    return work;
-  }
-
-  GenerationTaskModel _taskFromJson(
-    Map<String, dynamic> json, {
+  GenerationTaskModel _taskFromTicket(
+    TaskTicket ticket, {
     required String workId,
     required String taskType,
     required String targetType,
     String? targetId,
   }) {
-    final data = <String, dynamic>{
-      'workId': workId,
-      'taskType': taskType,
-      'targetType': targetType,
-      ...json,
-    };
-    if (targetId != null) data['targetId'] = targetId;
-    if (jsonString(data['taskId'] ?? data['id']) == null) {
+    if (ticket.taskId == null) {
       return _mockSucceededTask(
         workId: workId,
         taskType: taskType,
@@ -316,7 +261,17 @@ class WorkService extends GetxService {
         targetId: targetId,
       );
     }
-    return GenerationTaskModel.fromJson(data);
+    return GenerationTaskModel(
+      taskId: ticket.taskId!,
+      workId: workId,
+      taskType: taskType,
+      targetType: targetType,
+      targetId: targetId,
+      status: ticket.status,
+      progress: ticket.progress,
+      errorMessage: ticket.errorMessage,
+      pollingIntervalMs: ticket.pollingIntervalMs,
+    );
   }
 
   GenerationTaskModel _mockSucceededTask({

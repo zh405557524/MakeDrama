@@ -1,32 +1,37 @@
 part of 'index.dart';
 
+/// 场景相关接口。
 abstract class SceneAPI {
-  static Future<Map<String, dynamic>> getScenes(String workId) async {
-    return jsonMap(
-      await HttpService.to.getData('/api/v1/works/$workId/scenes'),
+  /// 获取作品的场景列表及其生成信息。
+  static Future<WorkStepResult> getScenes(String workId) async {
+    return WorkStepResult.fromJson(
+      jsonMap(await HttpService.to.getData('/api/v1/works/$workId/scenes')),
+      fallbackStep: WorkStep.scenes,
     );
   }
 
-  static Future<Map<String, dynamic>> createImageTask({
+  /// 为指定场景创建图片生成任务。
+  static Future<TaskTicket> createImageTask({
     required String workId,
     required String sceneId,
   }) async {
-    return jsonMap(
-      await HttpService.to.postData(
-        '/api/v1/works/$workId/scenes/$sceneId/image-task',
+    return TaskTicket.fromJson(
+      jsonMap(
+        await HttpService.to.postData(
+          '/api/v1/works/$workId/scenes/$sceneId/image-task',
+        ),
       ),
     );
   }
 
-  static Future<Map<String, dynamic>> saveSelection({
+  /// 保存用户选择的场景集合。
+  static Future<void> saveSelection({
     required String workId,
     required List<String> selectedSceneIds,
   }) async {
-    return jsonMap(
-      await HttpService.to.putData(
-        '/api/v1/works/$workId/scenes/selection',
-        data: {'selectedSceneIds': selectedSceneIds},
-      ),
+    await HttpService.to.putData(
+      '/api/v1/works/$workId/scenes/selection',
+      data: {'selectedSceneIds': selectedSceneIds},
     );
   }
 }
