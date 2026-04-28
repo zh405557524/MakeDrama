@@ -1,21 +1,16 @@
-import '../services/index.dart';
-import '../utils/index.dart';
+part of 'index.dart';
 
-class WorkApi {
-  WorkApi(this._http);
-
-  final HttpService _http;
-
-  Future<Map<String, dynamic>> getWorks() async {
-    return jsonMap(await _http.getData('/api/v1/works'));
+abstract class WorkAPI {
+  static Future<Map<String, dynamic>> getWorks() async {
+    return jsonMap(await HttpService.to.getData('/api/v1/works'));
   }
 
-  Future<Map<String, dynamic>> parseStory({
+  static Future<Map<String, dynamic>> parseStory({
     required String content,
     String? name,
   }) async {
     return jsonMap(
-      await _http.postData(
+      await HttpService.to.postData(
         '/api/v1/works/parse',
         data: {
           'content': content,
@@ -25,10 +20,12 @@ class WorkApi {
     );
   }
 
-  Future<Map<String, dynamic>> getStep({
+  static Future<Map<String, dynamic>> getStep({
     required String workId,
     required String step,
   }) async {
-    return jsonMap(await _http.getData('/api/v1/works/$workId/step/$step'));
+    return jsonMap(
+      await HttpService.to.getData('/api/v1/works/$workId/step/$step'),
+    );
   }
 }

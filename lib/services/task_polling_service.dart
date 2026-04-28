@@ -6,9 +6,6 @@ import '../apis/index.dart';
 import '../models/index.dart';
 
 class TaskPollingService extends GetxService {
-  TaskPollingService({required TaskApi taskApi}) : _taskApi = taskApi;
-
-  final TaskApi _taskApi;
   final Map<String, Timer> _timers = {};
 
   void watch(
@@ -52,7 +49,7 @@ class TaskPollingService extends GetxService {
   }) {
     _timers[taskId] = Timer(delay, () async {
       try {
-        final latest = await _taskApi.getTask(taskId);
+        final latest = await TaskAPI.getTask(taskId);
         onTick?.call(latest);
         if (latest.status.isTerminal) {
           cancel(taskId);

@@ -1,29 +1,25 @@
-import '../models/index.dart';
-import '../services/index.dart';
-import '../utils/index.dart';
+part of 'index.dart';
 
-class StoryboardApi {
-  StoryboardApi(this._http);
-
-  final HttpService _http;
-
-  Future<Map<String, dynamic>> getStoryboards(String workId) async {
-    return jsonMap(await _http.getData('/api/v1/works/$workId/storyboards'));
+abstract class StoryboardAPI {
+  static Future<Map<String, dynamic>> getStoryboards(String workId) async {
+    return jsonMap(
+      await HttpService.to.getData('/api/v1/works/$workId/storyboards'),
+    );
   }
 
-  Future<Map<String, dynamic>> updateStoryboard({
+  static Future<Map<String, dynamic>> updateStoryboard({
     required String workId,
     required StoryboardShot shot,
   }) async {
     return jsonMap(
-      await _http.putData(
+      await HttpService.to.putData(
         '/api/v1/works/$workId/storyboards/${shot.id}',
         data: shot.toUpdateJson(),
       ),
     );
   }
 
-  Future<Map<String, dynamic>> createStoryboard({
+  static Future<Map<String, dynamic>> createStoryboard({
     required String workId,
     required String description,
     String? insertAfterStoryboardId,
@@ -33,31 +29,40 @@ class StoryboardApi {
       data['insertAfterStoryboardId'] = insertAfterStoryboardId;
     }
     return jsonMap(
-      await _http.postData('/api/v1/works/$workId/storyboards', data: data),
+      await HttpService.to.postData(
+        '/api/v1/works/$workId/storyboards',
+        data: data,
+      ),
     );
   }
 
-  Future<void> deleteStoryboard({
+  static Future<void> deleteStoryboard({
     required String workId,
     required String storyboardId,
   }) async {
-    await _http.deleteData('/api/v1/works/$workId/storyboards/$storyboardId');
+    await HttpService.to.deleteData(
+      '/api/v1/works/$workId/storyboards/$storyboardId',
+    );
   }
 
-  Future<Map<String, dynamic>> generateStoryboard({
+  static Future<Map<String, dynamic>> generateStoryboard({
     required String workId,
     required String storyboardId,
   }) async {
     return jsonMap(
-      await _http.postData(
+      await HttpService.to.postData(
         '/api/v1/works/$workId/storyboards/$storyboardId/generate',
       ),
     );
   }
 
-  Future<Map<String, dynamic>> generateAllStoryboards(String workId) async {
+  static Future<Map<String, dynamic>> generateAllStoryboards(
+    String workId,
+  ) async {
     return jsonMap(
-      await _http.postData('/api/v1/works/$workId/storyboards/generate-all'),
+      await HttpService.to.postData(
+        '/api/v1/works/$workId/storyboards/generate-all',
+      ),
     );
   }
 }

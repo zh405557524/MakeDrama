@@ -7,24 +7,6 @@ import '../models/index.dart';
 import '../utils/index.dart';
 
 class WorkService extends GetxService {
-  WorkService({
-    required WorkApi workApi,
-    required CharacterApi characterApi,
-    required SceneApi sceneApi,
-    required StoryboardApi storyboardApi,
-    required VideoApi videoApi,
-  }) : _workApi = workApi,
-       _characterApi = characterApi,
-       _sceneApi = sceneApi,
-       _storyboardApi = storyboardApi,
-       _videoApi = videoApi;
-
-  final WorkApi _workApi;
-  final CharacterApi _characterApi;
-  final SceneApi _sceneApi;
-  final StoryboardApi _storyboardApi;
-  final VideoApi _videoApi;
-
   final List<DramaWork> _mockWorks = [];
 
   bool get useMock => AppConfig.useMockApi || Get.testMode;
@@ -35,7 +17,7 @@ class WorkService extends GetxService {
       return _mockWorks;
     }
 
-    final data = await _workApi.getWorks();
+    final data = await WorkAPI.getWorks();
     return jsonMapList(data['items']).map(_workFromListJson).toList();
   }
 
@@ -51,14 +33,14 @@ class WorkService extends GetxService {
       return work;
     }
 
-    final data = await _workApi.parseStory(content: content);
+    final data = await WorkAPI.parseStory(content: content);
     return _workFromStepJson(data, fallbackStep: WorkStep.characters);
   }
 
   Future<DramaWork> loadCharacters(String workId) async {
     if (useMock) return _findMockWork(workId);
     return _workFromStepJson(
-      await _characterApi.getCharacters(workId),
+      await CharacterAPI.getCharacters(workId),
       fallbackStep: WorkStep.characters,
     );
   }
@@ -81,7 +63,7 @@ class WorkService extends GetxService {
     }
 
     return _taskFromJson(
-      await _characterApi.createImageTask(
+      await CharacterAPI.createImageTask(
         workId: workId,
         characterId: character.id,
       ),
@@ -105,7 +87,7 @@ class WorkService extends GetxService {
       return work;
     }
 
-    await _characterApi.saveSelection(
+    await CharacterAPI.saveSelection(
       workId: workId,
       selectedCharacterIds: selectedCharacterIds,
     );
@@ -115,7 +97,7 @@ class WorkService extends GetxService {
   Future<DramaWork> loadScenes(String workId) async {
     if (useMock) return _findMockWork(workId);
     return _workFromStepJson(
-      await _sceneApi.getScenes(workId),
+      await SceneAPI.getScenes(workId),
       fallbackStep: WorkStep.scenes,
     );
   }
@@ -138,7 +120,7 @@ class WorkService extends GetxService {
     }
 
     return _taskFromJson(
-      await _sceneApi.createImageTask(workId: workId, sceneId: scene.id),
+      await SceneAPI.createImageTask(workId: workId, sceneId: scene.id),
       workId: workId,
       taskType: 'scene_image',
       targetType: 'scene',
@@ -159,7 +141,7 @@ class WorkService extends GetxService {
       return work;
     }
 
-    await _sceneApi.saveSelection(
+    await SceneAPI.saveSelection(
       workId: workId,
       selectedSceneIds: selectedSceneIds,
     );
@@ -169,7 +151,7 @@ class WorkService extends GetxService {
   Future<DramaWork> loadStoryboards(String workId) async {
     if (useMock) return _findMockWork(workId);
     return _workFromStepJson(
-      await _storyboardApi.getStoryboards(workId),
+      await StoryboardAPI.getStoryboards(workId),
       fallbackStep: WorkStep.storyboards,
     );
   }
@@ -179,7 +161,7 @@ class WorkService extends GetxService {
     required StoryboardShot shot,
   }) async {
     if (useMock) return;
-    await _storyboardApi.updateStoryboard(workId: workId, shot: shot);
+    await StoryboardAPI.updateStoryboard(workId: workId, shot: shot);
   }
 
   Future<GenerationTaskModel> generateStoryboard({
@@ -201,7 +183,7 @@ class WorkService extends GetxService {
     }
 
     return _taskFromJson(
-      await _storyboardApi.generateStoryboard(
+      await StoryboardAPI.generateStoryboard(
         workId: workId,
         storyboardId: shot.id,
       ),
@@ -230,7 +212,7 @@ class WorkService extends GetxService {
     }
 
     return _taskFromJson(
-      await _storyboardApi.generateAllStoryboards(workId),
+      await StoryboardAPI.generateAllStoryboards(workId),
       workId: workId,
       taskType: 'storyboard_batch',
       targetType: 'storyboard',
@@ -240,7 +222,7 @@ class WorkService extends GetxService {
   Future<DramaWork> loadVideo(String workId) async {
     if (useMock) return _findMockWork(workId);
     return _workFromStepJson(
-      await _videoApi.getVideo(workId),
+      await VideoAPI.getVideo(workId),
       fallbackStep: WorkStep.preview,
     );
   }
@@ -261,7 +243,7 @@ class WorkService extends GetxService {
     }
 
     return _taskFromJson(
-      await _videoApi.generateVideo(workId),
+      await VideoAPI.generateVideo(workId),
       workId: workId,
       taskType: 'video',
       targetType: 'work',
@@ -273,7 +255,7 @@ class WorkService extends GetxService {
     if (useMock) {
       return 'mock://share/$workId';
     }
-    final data = await _videoApi.createShareLink(workId: workId);
+    final data = await VideoAPI.createShareLink(workId: workId);
     return jsonStringValue(data['url']);
   }
 

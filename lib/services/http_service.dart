@@ -7,6 +7,8 @@ import '../utils/index.dart';
 import 'storage_service.dart';
 
 class HttpService extends GetxService {
+  static HttpService get to => Get.find<HttpService>();
+
   HttpService() {
     dio = Dio(
       BaseOptions(

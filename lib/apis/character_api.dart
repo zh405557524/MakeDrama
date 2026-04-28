@@ -1,32 +1,29 @@
-import '../services/index.dart';
-import '../utils/index.dart';
+part of 'index.dart';
 
-class CharacterApi {
-  CharacterApi(this._http);
-
-  final HttpService _http;
-
-  Future<Map<String, dynamic>> getCharacters(String workId) async {
-    return jsonMap(await _http.getData('/api/v1/works/$workId/characters'));
+abstract class CharacterAPI {
+  static Future<Map<String, dynamic>> getCharacters(String workId) async {
+    return jsonMap(
+      await HttpService.to.getData('/api/v1/works/$workId/characters'),
+    );
   }
 
-  Future<Map<String, dynamic>> createImageTask({
+  static Future<Map<String, dynamic>> createImageTask({
     required String workId,
     required String characterId,
   }) async {
     return jsonMap(
-      await _http.postData(
+      await HttpService.to.postData(
         '/api/v1/works/$workId/characters/$characterId/image-task',
       ),
     );
   }
 
-  Future<Map<String, dynamic>> saveSelection({
+  static Future<Map<String, dynamic>> saveSelection({
     required String workId,
     required List<String> selectedCharacterIds,
   }) async {
     return jsonMap(
-      await _http.putData(
+      await HttpService.to.putData(
         '/api/v1/works/$workId/characters/selection',
         data: {'selectedCharacterIds': selectedCharacterIds},
       ),
